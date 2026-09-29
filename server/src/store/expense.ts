@@ -1,45 +1,49 @@
-import { randomUUID } from "node:crypto";
 import type { Expense, NewExpense } from "../types/expense.js";
+import { pool } from "../db.js";
 
-// In-memory storage: resets whenever the server restarts. Seeded with a
-// couple of sample expenses so the app has something to show on first run.
-const expenses: Expense[] = [
-	{
-		id: randomUUID(),
-		description: "Groceries",
-		amount: 42.5,
-		date: "2026-08-01",
-	},
-	{
-		id: randomUUID(),
-		description: "Bus ticket",
-		amount: 3.2,
-		date: "2026-08-03",
-	},
-];
-
-export function getExpenses(): Expense[] {
-	return expenses;
+export async function getExpenses(): Promise<Expense[]> {
+        const result = await pool.query<Expense>(
+                "SELECT id, description, amount, date FROM expenses ORDER BY date DESC"
+        );
+        return result.rows;
 }
 
-export function addExpense(newExpense: NewExpense): Expense {
-	const expense: Expense = { id: randomUUID(), ...newExpense };
-	expenses.push(expense);
-	return expense;
+export async function addExpense(newExpense: NewExpense): Promise<Expense> {
+        const result = await pool.query<Expense>(
+                `INSERT INTO expenses (description, amount, date)
+                 VALUES ($1, $2, $3)
+                 RETURNING id, description, amount, date`,
+                [newExpense.description, newExpense.amount, newExpense.date]
+        );
+        return result.rows[0];
 }
 
-// Returns the updated expense, or null if no expense has this id.
-export function updateExpense(id: string, update: NewExpense): Expense | null {
-	const expense = expenses.find((expense) => expense.id === id);
-	if (!expense) return null;
-	Object.assign(expense, update);
-	return expense;
+export async function getExpense(id: string): Promise<Expense | null> {
+        const result = await pool.query<Expense>(
+                "SELECT id, description, amount, date FROM expenses WHERE id = $1",
+                [id]
+        );
+        return result.rows[0] ?? null;
 }
 
-// Returns true if an expense was removed, false if no expense has this id.
-export function deleteExpense(id: string): boolean {
-	const index = expenses.findIndex((expense) => expense.id === id);
-	if (index === -1) return false;
-	expenses.splice(index, 1);
-	return true;
+export async function updateExpense(
+        id: string,
+        update: NewExpense
+): Promise<Expense | null> {
+        const result = await pool.query<Expense>(
+                `UPDATE expenses
+                 SET description = $1, amount = $2, date = $3
+                 WHERE id = $4
+                 RETURNING id, description, amount, date`,
+                [update.description, update.amount, update.date, id]
+        );
+        return result.rows[0] ?? null;
+}
+
+export async function deleteExpense(id: string): Promise<boolean> {
+        const result = await pool.query(
+                "DELETE FROM expenses WHERE id = $1",
+                [id]
+        );
+        return (result.rowCount ?? 0) > 0;
 }
