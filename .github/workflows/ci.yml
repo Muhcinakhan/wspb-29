@@ -1,0 +1,45 @@
+name: CI Pipeline
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Lint client
+        run: |
+          cd client
+          npm ci
+          npm run lint
+      - name: Lint server
+        run: |
+          cd server
+          npm ci
+          npm run lint
+
+  build:
+    name: Build
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build client
+        run: |
+          cd client
+          npm ci
+          npm run build
+      - name: Build server
+        run: |
+          cd server
+          npm ci
+          npm run build
